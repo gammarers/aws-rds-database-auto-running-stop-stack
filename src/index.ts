@@ -7,8 +7,18 @@ import * as sfn from 'aws-cdk-lib/aws-stepfunctions';
 import * as tasks from 'aws-cdk-lib/aws-stepfunctions-tasks';
 import { Construct } from 'constructs';
 
+export interface TargetResourceProperty {
+  readonly tagKey: string;
+  readonly tagValues: string[];
+}
+
+export interface RDSDatabaseAutoRunningStopStackProps extends StackProps {
+  readonly targetResource: TargetResourceProperty;
+  readonly enableRule?: boolean;
+}
+
 export class RDSDatabaseAutoRunningStopStack extends Stack {
-  constructor(scope: Construct, id: string, props?: StackProps) {
+  constructor(scope: Construct, id: string, props?: RDSDatabaseAutoRunningStopStackProps) {
     super(scope, id, props);
 
     const account = Stack.of(this).account;
@@ -105,7 +115,7 @@ export class RDSDatabaseAutoRunningStopStack extends Stack {
         ),
       );
 
-    // 👇StepFunctions
+    // 👇 StepFunctions
     const stateMachine = new sfn.StateMachine(this, 'StateMachine', {
       stateMachineName: `db-auto-start-stop-${key}-state-machine`,
       //role: machineRole,
@@ -140,10 +150,15 @@ export class RDSDatabaseAutoRunningStopStack extends Stack {
       },
     });
 
-    // 👇EventBridge by RDS DB Instance Auto Start Event
+    const enableRule: boolean = (() => {
+      return props?.enableRule === undefined || props.enableRule;
+    })();
+
+    // 👇 EventBridge by RDS DB Instance Auto Start Event
     new events.Rule(this, 'DBInstanceEvent', {
       ruleName: `db-instance-start-event-catch-${key}-rule`,
       description: 'db instance start event catch rule.',
+      enabled: enableRule,
       eventPattern: {
         source: ['aws.rds'],
         detailType: ['RDS DB Instance Event'],
@@ -158,10 +173,11 @@ export class RDSDatabaseAutoRunningStopStack extends Stack {
       ],
     });
 
-    // 👇EventBridge by RDS DB Instance Auto Start Event
+    // 👇 EventBridge by RDS DB Instance Auto Start Event
     new events.Rule(this, 'DBClusterEvent', {
       ruleName: `db-cluster-start-event-catch-${key}-rule`,
       description: 'db cluster start event catch rule',
+      enabled: enableRule,
       eventPattern: {
         source: ['aws.rds'],
         detailType: ['RDS DB Cluster Event'],
