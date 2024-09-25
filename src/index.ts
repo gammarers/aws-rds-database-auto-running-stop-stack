@@ -7,18 +7,18 @@ import * as sfn from 'aws-cdk-lib/aws-stepfunctions';
 import * as tasks from 'aws-cdk-lib/aws-stepfunctions-tasks';
 import { Construct } from 'constructs';
 
-//export interface TargetResourceProperty {
-//  readonly tagKey: string;
-//  readonly tagValues: string[];
-//}
+export interface TargetResourceProperty {
+  readonly tagKey: string;
+  readonly tagValues: string[];
+}
 
 export interface RDSDatabaseAutoRunningStopStackProps extends StackProps {
-  // readonly targetResource: TargetResourceProperty;
+  readonly targetResource: TargetResourceProperty;
   readonly enableRule?: boolean;
 }
 
 export class RDSDatabaseAutoRunningStopStack extends Stack {
-  constructor(scope: Construct, id: string, props?: RDSDatabaseAutoRunningStopStackProps) {
+  constructor(scope: Construct, id: string, props: RDSDatabaseAutoRunningStopStackProps) {
     super(scope, id, props);
 
     const account = Stack.of(this).account;
@@ -176,13 +176,45 @@ export class RDSDatabaseAutoRunningStopStack extends Stack {
         cause: 'db instance or cluster status fail.',
       }));
 
-    describeDBInstancesTask.next(statusChoice);
-    describeDBClustersTask.next(statusChoice);
+    // 👇 Tag Match
+    const tagMatchChoice = new sfn.Choice(this, 'ExistTagChoide')
+      .when(
+        sfn.Condition.isPresent('$.result.describe.tags'),
+        new sfn.Pass(this, 'ContainTagVlue', {
+          resultPath: '$.check.tag',
+          parameters: {
+            isContain: sfn.JsonPath.arrayContains(
+              sfn.JsonPath.stringAt('$.params.tagValues'),
+              sfn.JsonPath.arrayGetItem(sfn.JsonPath.stringAt('$.result.describe.tags[?(@.Key == $.params.tagKey)].Value'), 0),
+            ),
+          },
+        }).next(
+          new sfn.Choice(this, 'FilterTagChoise')
+            .when(
+              sfn.Condition.booleanEquals('$.check.tag.isContain', true),
+              statusChoice,
+            )
+            .otherwise(
+              new sfn.Pass(this, 'NoTagMatch', {
+                comment: 'no tag match',
+              }),
+            ),
+        ),
+      )
+      .otherwise(
+        new sfn.Pass(this, 'NoTagsFound', {
+          comment: 'no tags found',
+        }),
+      );
+
+    // 👇 describe next tag found & match
+    describeDBInstancesTask.next(tagMatchChoice);
+    describeDBClustersTask.next(tagMatchChoice);
 
     // 👇 StepFunctions
     const stateMachine = new sfn.StateMachine(this, 'StateMachine', {
       stateMachineName: `rds-db-auto-running-stop-${key}-state-machine`,
-      definition: statusesDefinition,
+      definitionBody: sfn.DefinitionBody.fromChainable(statusesDefinition),
     });
     const role = stateMachine.node.findChild('Role') as iam.Role;
     const cfnRole = role.node.defaultChild as iam.CfnRole;
@@ -214,7 +246,7 @@ export class RDSDatabaseAutoRunningStopStack extends Stack {
     });
 
     const enableRule: boolean = (() => {
-      return props?.enableRule === undefined || props.enableRule;
+      return props.enableRule === undefined || props.enableRule;
     })();
 
     // 👇 EventBridge by RDS DB Instance Auto Start Event
@@ -234,10 +266,10 @@ export class RDSDatabaseAutoRunningStopStack extends Stack {
           role: execRole,
           input: events.RuleTargetInput.fromObject({
             event: events.EventField.fromPath('$'),
-            // params: {
-            //   tagKey: props.targetResource.tagKey,
-            //   tagValues: props.targetResource.tagValues,
-            // },
+            params: {
+              tagKey: props.targetResource.tagKey,
+              tagValues: props.targetResource.tagValues,
+            },
           }),
         }),
       ],
@@ -260,10 +292,10 @@ export class RDSDatabaseAutoRunningStopStack extends Stack {
           role: execRole,
           input: events.RuleTargetInput.fromObject({
             event: events.EventField.fromPath('$'),
-            // params: {
-            //   tagKey: props.targetResource.tagKey,
-            //   tagValues: props.targetResource.tagValues,
-            // },
+            params: {
+              tagKey: props.targetResource.tagKey,
+              tagValues: props.targetResource.tagValues,
+            },
           }),
         }),
       ],

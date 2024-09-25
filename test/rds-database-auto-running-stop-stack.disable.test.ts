@@ -8,6 +8,10 @@ describe('RDSDatabaseAutoRunningStopStack Disabble Testing', () => {
 
   const stack = new RDSDatabaseAutoRunningStopStack(app, 'RDSDatabaseAutoRunningStopStack', {
     enableRule: false,
+    targetResource: {
+      tagKey: 'AutoRunningStop',
+      tagValues: ['YES'],
+    },
     env: {
       account: '123456789012',
       region: 'us-east-1',

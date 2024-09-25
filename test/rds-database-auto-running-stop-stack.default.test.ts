@@ -11,6 +11,10 @@ describe('RDSDatabaseAutoRunningStopStack Default Testing', () => {
       account: '123456789012',
       region: 'us-east-1',
     },
+    targetResource: {
+      tagKey: 'AutoRunningStop',
+      tagValues: ['YES'],
+    },
   });
 
   const template = Template.fromStack(stack);
