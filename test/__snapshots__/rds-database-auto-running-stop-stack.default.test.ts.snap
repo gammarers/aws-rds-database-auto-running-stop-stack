@@ -1,0 +1,280 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`RDSDatabaseAutoRunningStopStack Default Testing Should match snapshot 1`] = `
+{
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "DBClusterEvent9BF26607": {
+      "Properties": {
+        "Description": "db cluster running event catch rule",
+        "EventPattern": {
+          "detail": {
+            "EventID": [
+              "RDS-EVENT-0153",
+            ],
+          },
+          "detail-type": [
+            "RDS DB Cluster Event",
+          ],
+          "source": [
+            "aws.rds",
+          ],
+        },
+        "Name": "rds-db-cluster-running-event-catch-b3cb1157-rule",
+        "State": "ENABLED",
+        "Targets": [
+          {
+            "Arn": {
+              "Ref": "StateMachine2E01A3A5",
+            },
+            "Id": "Target0",
+            "InputTransformer": {
+              "InputPathsMap": {
+                "f1": "$",
+              },
+              "InputTemplate": "{"event":<f1>,"params":{"tagKey":"AutoRunningStop","tagValues":["YES"]}}",
+            },
+            "RoleArn": {
+              "Fn::GetAtt": [
+                "EventExecRole849D1777",
+                "Arn",
+              ],
+            },
+          },
+        ],
+      },
+      "Type": "AWS::Events::Rule",
+    },
+    "DBInstanceEvent92EBE80A": {
+      "Properties": {
+        "Description": "rds db instance running event catch rule.",
+        "EventPattern": {
+          "detail": {
+            "EventID": [
+              "RDS-EVENT-0154",
+            ],
+          },
+          "detail-type": [
+            "RDS DB Instance Event",
+          ],
+          "source": [
+            "aws.rds",
+          ],
+        },
+        "Name": "rds-db-instance-running-event-catch-b3cb1157-rule",
+        "State": "ENABLED",
+        "Targets": [
+          {
+            "Arn": {
+              "Ref": "StateMachine2E01A3A5",
+            },
+            "Id": "Target0",
+            "InputTransformer": {
+              "InputPathsMap": {
+                "f1": "$",
+              },
+              "InputTemplate": "{"event":<f1>,"params":{"tagKey":"AutoRunningStop","tagValues":["YES"]}}",
+            },
+            "RoleArn": {
+              "Fn::GetAtt": [
+                "EventExecRole849D1777",
+                "Arn",
+              ],
+            },
+          },
+        ],
+      },
+      "Type": "AWS::Events::Rule",
+    },
+    "EventExecRole849D1777": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "events.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Description": "db auto start catch with start state machine event role",
+        "Policies": [
+          {
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Action": "states:StartExecution",
+                  "Effect": "Allow",
+                  "Resource": {
+                    "Ref": "StateMachine2E01A3A5",
+                  },
+                },
+              ],
+              "Version": "2012-10-17",
+            },
+            "PolicyName": "state-machine-exec",
+          },
+        ],
+        "RoleName": "rds-db-auto-running-catch-event-b3cb1157-role",
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "EventExecRoleDefaultPolicyB3284D41": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "states:StartExecution",
+              "Effect": "Allow",
+              "Resource": {
+                "Ref": "StateMachine2E01A3A5",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "EventExecRoleDefaultPolicyB3284D41",
+        "Roles": [
+          {
+            "Ref": "EventExecRole849D1777",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "StateMachine2E01A3A5": {
+      "DeletionPolicy": "Delete",
+      "DependsOn": [
+        "StateMachineRoleDefaultPolicyDF1E6607",
+        "StateMachineRoleB840431D",
+      ],
+      "Properties": {
+        "DefinitionString": {
+          "Fn::Join": [
+            "",
+            [
+              "{"StartAt":"StatusesDefinition","States":{"StatusesDefinition":{"Type":"Pass","Result":[{"name":"AVAILABLE","emoji":"🤩","state":"available"},{"name":"AUTOSTOPPED","emoji":"😴","state":"stopped"}],"ResultPath":"$.definition.statuses","Next":"DescribeTypeChoice"},"DescribeTypeChoice":{"Type":"Choice","Choices":[{"And":[{"Variable":"$.event.detail-type","StringEquals":"RDS DB Instance Event"},{"Variable":"$.event.detail.SourceType","StringEquals":"DB_INSTANCE"},{"Variable":"$.event.detail.EventID","StringEquals":"RDS-EVENT-0154"}],"Next":"DescribeDBInstances"},{"And":[{"Variable":"$.event.detail-type","StringEquals":"RDS DB Cluster Event"},{"Variable":"$.event.detail.SourceType","StringEquals":"CLUSTER"},{"Variable":"$.event.detail.EventID","StringEquals":"RDS-EVENT-0153"}],"Next":"DescribeDBClusters"}],"Default":"UnknownType"},"StatusChangeWait":{"Type":"Wait","Seconds":300,"Next":"DescribeTypeChoice"},"StopDBInstance":{"Next":"StatusChangeWait","Type":"Task","ResultPath":"$.result.stop","Resource":"arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":states:::aws-sdk:rds:stopDBInstance","Parameters":{"DbInstanceIdentifier.$":"$.event.detail.SourceIdentifier"}},"StatusChoice":{"Type":"Choice","Choices":[{"And":[{"Variable":"$.event.detail-type","StringEquals":"RDS DB Instance Event"},{"Variable":"$.event.detail.SourceType","StringEquals":"DB_INSTANCE"},{"Variable":"$.event.detail.EventID","StringEquals":"RDS-EVENT-0154"},{"Variable":"$.result.describe.status","StringEquals":"available"}],"Next":"StopDBInstance"},{"And":[{"Variable":"$.event.detail-type","StringEquals":"RDS DB Cluster Event"},{"Variable":"$.event.detail.SourceType","StringEquals":"CLUSTER"},{"Variable":"$.event.detail.EventID","StringEquals":"RDS-EVENT-0153"},{"Variable":"$.result.describe.status","StringEquals":"available"}],"Next":"StopDBCluster"},{"And":[{"Or":[{"And":[{"Variable":"$.event.detail-type","StringEquals":"RDS DB Instance Event"},{"Variable":"$.event.detail.SourceType","StringEquals":"DB_INSTANCE"},{"Variable":"$.event.detail.EventID","StringEquals":"RDS-EVENT-0154"}]},{"And":[{"Variable":"$.event.detail-type","StringEquals":"RDS DB Cluster Event"},{"Variable":"$.event.detail.SourceType","StringEquals":"CLUSTER"},{"Variable":"$.event.detail.EventID","StringEquals":"RDS-EVENT-0153"}]}]},{"Variable":"$.result.describe.status","StringEquals":"stopped"}],"Next":"Succeed"},{"Or":[{"Variable":"$.result.describe.status","StringEquals":"starting"},{"Variable":"$.result.describe.status","StringEquals":"configuring-enhanced-monitoring"},{"Variable":"$.result.describe.status","StringEquals":"backing-up"},{"Variable":"$.result.describe.status","StringEquals":"modifying"},{"Variable":"$.result.describe.status","StringEquals":"stopping"}],"Next":"StatusChangeWait"}],"Default":"StatusFail"},"FilterTagChoise":{"Type":"Choice","Choices":[{"Variable":"$.check.tag.isContain","BooleanEquals":true,"Next":"StatusChoice"}],"Default":"NoTagMatch"},"ContainTagVlue":{"Type":"Pass","ResultPath":"$.check.tag","Parameters":{"isContain.$":"States.ArrayContains($.params.tagValues, States.ArrayGetItem($.result.describe.tags[?(@.Key == $.params.tagKey)].Value, 0))"},"Next":"FilterTagChoise"},"ExistTagChoide":{"Type":"Choice","Choices":[{"Variable":"$.result.describe.tags","IsPresent":true,"Next":"ContainTagVlue"}],"Default":"NoTagsFound"},"DescribeDBInstances":{"Next":"ExistTagChoide","Type":"Task","ResultPath":"$.result.describe","ResultSelector":{"status.$":"$.DbInstances[0].DbInstanceStatus","identifier.$":"$.DbInstances[0].DbInstanceIdentifier","tags.$":"$.DbInstances[0].TagList"},"Resource":"arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":states:::aws-sdk:rds:describeDBInstances","Parameters":{"DbInstanceIdentifier.$":"$.event.detail.SourceIdentifier"}},"DescribeDBClusters":{"Next":"ExistTagChoide","Type":"Task","ResultPath":"$.result.describe","ResultSelector":{"status.$":"$.DbClusters[0].Status","identifier.$":"$.DbClusters[0].DbClusterIdentifier","tags.$":"$.DbClusters[0].TagList"},"Resource":"arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":states:::aws-sdk:rds:describeDBClusters","Parameters":{"DbClusterIdentifier.$":"$.event.detail.SourceIdentifier"}},"NoTagsFound":{"Type":"Pass","Comment":"no tags found","End":true},"NoTagMatch":{"Type":"Pass","Comment":"no tag match","End":true},"StatusFail":{"Type":"Fail","Cause":"db instance or cluster status fail."},"StopDBCluster":{"Next":"StatusChangeWait","Type":"Task","ResultPath":"$.result.stop","Resource":"arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":states:::aws-sdk:rds:stopDBCluster","Parameters":{"DbClusterIdentifier.$":"$.event.detail.SourceIdentifier"}},"Succeed":{"Type":"Succeed"},"UnknownType":{"Type":"Fail"}}}",
+            ],
+          ],
+        },
+        "RoleArn": {
+          "Fn::GetAtt": [
+            "StateMachineRoleB840431D",
+            "Arn",
+          ],
+        },
+        "StateMachineName": "rds-db-auto-running-stop-b3cb1157-state-machine",
+      },
+      "Type": "AWS::StepFunctions::StateMachine",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "StateMachineRoleB840431D": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "states.us-east-1.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Description": "rds database auto running stop state machine role.",
+        "RoleName": "rds-db-auto-running-stop-state-machine-b3cb1157-role",
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "StateMachineRoleDefaultPolicyDF1E6607": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "rds:stopDBInstance",
+              "Effect": "Allow",
+              "Resource": "arn:aws:rds:*:123456789012:db:*",
+            },
+            {
+              "Action": "rds:describeDBInstances",
+              "Effect": "Allow",
+              "Resource": "arn:aws:rds:*:123456789012:db:*",
+            },
+            {
+              "Action": "rds:describeDBClusters",
+              "Effect": "Allow",
+              "Resource": "arn:aws:rds:*:123456789012:cluster:*",
+            },
+            {
+              "Action": "rds:stopDBCluster",
+              "Effect": "Allow",
+              "Resource": "arn:aws:rds:*:123456789012:cluster:*",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "default-policy",
+        "Roles": [
+          {
+            "Ref": "StateMachineRoleB840431D",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;
